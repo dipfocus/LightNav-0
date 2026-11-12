@@ -8,7 +8,7 @@
     serverUrl: $("server-url"), serverUrlSave: $("server-url-save"),
     count: $("waypoint-count"), latency: $("latency"), rate: $("result-rate"), sequence: $("sequence"), vlnStatus: $("vln-status"),
     robotMode: $("robot-mode"), battery: $("battery"), imu: $("imu"), motor: $("motor"), robotStatus: $("robot-status"),
-    control: $("control-toggle"), stop: $("stop-button"), walkAction: $("walk-action"), sitAction: $("sit-action"), policyToggle: $("policy-toggle"), linearTarget: $("linear-target"),
+    control: $("control-toggle"), stop: $("stop-button"), standAction: $("stand-action"), walkAction: $("walk-action"), sitAction: $("sit-action"), policyToggle: $("policy-toggle"), linearTarget: $("linear-target"),
     linearFeedback: $("linear-feedback"), angularTarget: $("angular-target"), angularFeedback: $("angular-feedback"),
     linearChart: $("linear-chart"), angularChart: $("angular-chart"), toast: $("toast"),
     wifiButton: $("wifi-button"), wifiModal: $("wifi-modal"), wifiClose: $("wifi-close"),
@@ -292,8 +292,12 @@
       render();
     }
   }
+  function robotCanDrive(robot) {
+    const readyMode = String(robot.adapter || "").toLowerCase() === "g1d" ? "READY" : "WALK";
+    return robot.connected && robot.mode === readyMode;
+  }
   function manualCommand() {
-    if (!state.owner || state.robot.mode !== "WALK") return {linear:0, angular:0};
+    if (!state.owner || !robotCanDrive(state.robot)) return {linear:0, angular:0};
     return {
       linear: ((state.keys.has("w") ? 1 : 0) - (state.keys.has("s") ? 1 : 0)) * state.limits.linear,
       angular: ((state.keys.has("a") ? 1 : 0) - (state.keys.has("d") ? 1 : 0)) * state.limits.angular
@@ -311,7 +315,7 @@
     const now = performance.now();
     const dt = Math.min(0.2, Math.max(0, (now - manualRamp.updatedMs) / 1000));
     manualRamp.updatedMs = now;
-    if (state.owner && state.robot.mode === "WALK") {
+    if (state.owner && robotCanDrive(state.robot)) {
       const target = manualCommand();
       manualRamp.linear = approach(manualRamp.linear, target.linear, state.limits.linearAccel * dt);
       manualRamp.angular = approach(manualRamp.angular, target.angular, state.limits.angularAccel * dt);
@@ -406,14 +410,23 @@
       ? `${robot.adapter || "robot"} · ${robot.robot_id || "online"}`
       : (robot.message || "Waiting for robot adapter");
     const isGo2 = String(robot.adapter || "").toLowerCase() === "go2";
-    ui.walkAction.hidden = isGo2;
+    const isG1d = String(robot.adapter || "").toLowerCase() === "g1d";
+    ui.standAction.hidden = isG1d;
+    ui.walkAction.hidden = isGo2 || isG1d;
+    ui.sitAction.hidden = isG1d;
     setText(ui.sitAction, isGo2 ? "Lie down" : "Crouch");
-    setDisabled(ui.control, !state.connected || !robot.connected || (state.locked && !state.owner));
+    const g1dStopping = isG1d && !["READY", "FAULT"].includes(robot.mode);
+    if (isG1d && ["FAULT", "STOPPED", "STOPPING"].includes(robot.mode)) {
+      ui.robotStatus.textContent = robot.mode === "STOPPING"
+        ? "Stopping the wheel base; wait before taking control"
+        : (robot.message || robot.mode);
+    }
+    setDisabled(ui.control, !state.connected || !robot.connected || (state.locked && !state.owner) || (g1dStopping && !state.owner));
     setText(ui.control, state.owner ? "Release manual control" : (state.autoOwner ? "MPC auto control" : (state.locked ? "Another page is in control" : "Take manual control")));
     ui.control.classList.toggle("active", state.owner);
     setDisabled(ui.stop, !state.connected);
     document.querySelectorAll("[data-action]").forEach((button) => setDisabled(button, !state.owner || !robot.connected));
-    ui.policyToggle.hidden = !robot.vln_policy;
+    ui.policyToggle.hidden = isG1d || !robot.vln_policy;
     if (!ui.policyToggle.hidden) {
       const policy = String(robot.policy || "");
       const isVlnPolicy = policy === robot.vln_policy;
@@ -422,7 +435,7 @@
       ui.policyToggle.classList.toggle("active", isVlnPolicy);
       setDisabled(ui.policyToggle, !state.connected || !robot.connected);
     }
-    document.querySelectorAll(".key").forEach((button) => setDisabled(button, !state.owner || robot.mode !== "WALK"));
+    document.querySelectorAll(".key").forEach((button) => setDisabled(button, !state.owner || !robotCanDrive(robot)));
     renderWifi();
   }
 
@@ -666,7 +679,7 @@
       else ui.stop.click();
       return;
     }
-    if (state.owner && state.robot.mode === "WALK" && "wasd".includes(key)) {
+    if (state.owner && robotCanDrive(state.robot) && "wasd".includes(key)) {
       event.preventDefault(); state.keys.add(key); publishManual();
     }
   });

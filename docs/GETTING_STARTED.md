@@ -207,6 +207,8 @@ ROS 2 on-robot stack — camera driver, this WebSocket client, an MPC waypoint t
 web control panel — with adapters for the Unitree Go2 and LimX TRON 1, and a
 [bring-your-own-robot](../robot_deploy/README.md#bring-your-own-robot) adapter interface.
 
+For Unitree G1-D, see the [setup guide](../robot_deploy/README.md#unitree-g1-d).
+
 ## Visualisation
 
 Every prediction can be rendered on the robot's own frames as a ground-plane trajectory

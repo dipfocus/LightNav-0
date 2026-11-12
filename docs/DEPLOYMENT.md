@@ -12,6 +12,9 @@ panel, and robot adapters (Unitree Go2, LimX TRON1) — lives in
 [`mujoco_demo/`](../mujoco_demo/README.md) exercises the same protocol and MPC
 against a simulated TurtleBot, no robot required.
 
+The [G1-D integration](../robot_deploy/README.md#unitree-g1-d) defaults to native DDS
+odometry and ZMQ camera input.
+
 The GPU host does not have to be remote: [JETSON_THOR.md](JETSON_THOR.md) documents
 serving the model **onboard** from a robot's own NVIDIA Jetson Thor (SM 11.0 kernel
 pitfalls, unified-memory budgeting, ViT-cache sizing, a measured 4+ Hz closed loop),

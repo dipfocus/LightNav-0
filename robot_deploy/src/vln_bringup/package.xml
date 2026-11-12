@@ -11,11 +11,13 @@
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>g1d_adapter</exec_depend>
   <exec_depend>go2_adapter</exec_depend>
   <exec_depend>orbbec_camera</exec_depend>
   <exec_depend>orbbec_description</exec_depend>
   <exec_depend>tron_adapter</exec_depend>
   <exec_depend>vln_client</exec_depend>
+  <exec_depend>vln_camera</exec_depend>
   <exec_depend>vln_mpc</exec_depend>
   <exec_depend>vln_web</exec_depend>
 

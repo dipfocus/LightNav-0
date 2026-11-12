@@ -12,10 +12,12 @@ robot_deploy/
 ├── scripts/           # build.sh
 └── src/
     ├── vln_client/    # camera → lightnav-serve WebSocket client
+    ├── vln_camera/    # standalone JPEG sender + ZMQ → ROS image bridge
     ├── vln_mpc/       # waypoint alignment + tracking MPC
     ├── vln_web/       # web control panel (port 8088)
     ├── vln_bringup/   # launch files: tron / go2
     └── robot_adapters/
+        ├── g1d_adapter/   # Unitree G1-D wheel base + native odometry bridge
         ├── go2_adapter/   # Unitree Go2 (unitree_sdk2py)
         └── tron_adapter/  # LimX TRON1 (WebSocket protocol)
 ```
@@ -110,6 +112,24 @@ Both launch files also start the Orbbec Gemini 330 driver (color-only,
 `image_transport` (`raw` or `compressed`) parameters and drop the Orbbec
 include from the launch file.
 
+### Unitree G1-D
+
+Controls the wheel base only. Install the SDK using the
+[G1-D guide](src/robot_adapters/g1d_adapter/README.md) and start the
+[camera sender](src/vln_camera/README.md#standalone-sender).
+Defaults: ZMQ camera at `tcp://192.168.100.78:5556`, native DDS odometry
+(`rt/agv/odom` → `g1d/odom`), speed limits **0.3 m/s** and **0.3 rad/s**.
+
+```bash
+ros2 launch vln_bringup g1d.launch.py \
+  network_interface:=eth0 \
+  server_url:=ws://GPU_HOST:8050
+```
+
+Replace `eth0` with the robot's DDS interface and use `--task vln` on the GPU server.
+Synchronize camera and odometry clocks. For camera/odometry overrides, see
+[configuration](../docs/CONFIGURATION.md#g1-d-ros-2-launch).
+
 ## Web panel
 
 `vln_web` serves a single-page panel on port `8088`: live camera preview with
@@ -120,6 +140,7 @@ velocity charts, and Wi-Fi switching for the onboard computer (via `nmcli`).
 
 ## Packages
 
+- **`vln_camera`** — standalone JPEG sender and XRAW v2 ZMQ-to-ROS image bridge.
 - **`vln_client`** — subscribes to the camera, talks to `lightnav-serve`, and
   publishes the inference response, status, and a visualization path.
 - **`vln_mpc`** — aligns waypoints to `odom` at image-capture time and tracks
@@ -127,6 +148,7 @@ velocity charts, and Wi-Fi switching for the onboard computer (via `nmcli`).
 - **`vln_web`** — the web panel above.
 - **`vln_bringup`** — launch files composing camera + client + MPC + web +
   adapter per robot.
+- **`g1d_adapter`** — G1-D wheel-base control and native DDS odometry bridge.
 - **`go2_adapter` / `tron_adapter`** — translate the common interface below to
   each robot's native API.
 

@@ -56,6 +56,15 @@ class Logger(Protocol):
     def info(self, message: str) -> None: ...
 
 
+def robot_ready_mode(robot: dict[str, Any]) -> str:
+    """Wheel bases have no walking posture; keep legacy adapter modes intact."""
+    return "READY" if str(robot.get("adapter", "")).lower() == "g1d" else "WALK"
+
+
+def robot_motion_ready(robot: dict[str, Any]) -> bool:
+    return bool(robot.get("connected")) and robot.get("mode") == robot_ready_mode(robot)
+
+
 def display_host(bind_host: str) -> str:
     """Return a useful LAN address when the server binds every interface."""
     if bind_host not in WILDCARD_HOSTS:
@@ -694,11 +703,11 @@ class WebServer:
                 if not robot.get("connected"):
                     await self._input_error(websocket, "robot is disconnected")
                     return
-                if robot.get("mode") != "WALK":
+                if not robot_motion_ready(robot):
                     await self._input_error(
                         websocket,
                         "robot mode is "
-                        f"{robot.get('mode', 'UNKNOWN')}; enter WALK first",
+                        f"{robot.get('mode', 'UNKNOWN')}; requires {robot_ready_mode(robot)}",
                     )
                     return
                 if not mpc.get("available"):
@@ -718,6 +727,12 @@ class WebServer:
                 ):
                     await self._input_error(
                         websocket, "another browser owns manual control"
+                    )
+                    return
+                if self._controller is websocket and robot_ready_mode(robot) == "READY":
+                    await self._input_error(
+                        websocket,
+                        "G1-D: release manual control and wait for READY before starting VLN",
                     )
                     return
                 if self._controller is websocket:
@@ -829,10 +844,10 @@ class WebServer:
             if not robot.get("connected"):
                 await self._input_error(websocket, "robot is disconnected")
                 return
-            if robot.get("mode") != "WALK":
+            if not robot_motion_ready(robot):
                 await self._input_error(
                     websocket,
-                    f"robot mode is {robot.get('mode', 'UNKNOWN')}; enter WALK first",
+                    f"robot mode is {robot.get('mode', 'UNKNOWN')}; requires {robot_ready_mode(robot)}",
                 )
                 return
             if not mpc.get("available"):
@@ -848,6 +863,12 @@ class WebServer:
                     websocket, "another browser owns manual control"
                 )
                 return
+            if self._controller is websocket and robot_ready_mode(robot) == "READY":
+                await self._input_error(
+                    websocket,
+                    "G1-D: release manual control and wait for READY before enabling MPC",
+                )
+                return
             if self._controller is websocket:
                 await self._release_controller("switching to MPC control")
             self._auto_controller = websocket
@@ -856,9 +877,16 @@ class WebServer:
             return
         if kind == "acquire_control":
             with self._state_lock:
-                robot_connected = bool(self._robot.get("connected"))
-            if not robot_connected:
+                robot = dict(self._robot)
+            if not robot.get("connected"):
                 await self._input_error(websocket, "robot is disconnected")
+                return
+            if robot_ready_mode(robot) == "READY" and robot.get("mode") not in {"READY", "FAULT"}:
+                await self._input_error(
+                    websocket,
+                    f"G1-D is {robot.get('mode', 'UNKNOWN')}; wait for stop completion "
+                    "or reset the software stop latch",
+                )
                 return
             if self._auto_controller is not None:
                 await self._input_error(websocket, "MPC auto control is active")
@@ -915,6 +943,13 @@ class WebServer:
             return
         if kind == "robot_action":
             action = str(payload.get("action", "")).strip().lower()
+            with self._state_lock:
+                is_g1d = str(self._robot.get("adapter", "")).lower() == "g1d"
+            if is_g1d:
+                await self._input_error(
+                    websocket, "G1-D wheel-base adapter does not support posture or policy actions"
+                )
+                return
             if (
                 action != "toggle_policy"
                 and self._controller is not websocket

@@ -179,3 +179,110 @@ Frames within one session must share one size (the first frame decides; `reset` 
 over). `keep` avoids geometric distortion but changes the token grid the model sees, which
 the released checkpoint was not trained on — validate on your robot before relying on it.
 Full native resolution (feeding the camera's own pixel count) is not supported.
+
+## G1-D ROS 2 launch
+
+Defaults to native odometry and ZMQ camera input. Start the camera sender separately.
+See [deployment](../robot_deploy/README.md#unitree-g1-d) for the launch command.
+
+| Launch argument | Default | Meaning |
+| --- | --- | --- |
+| `network_interface` | required | Robot DDS network interface |
+| `dds_domain_id` | `0` | Unitree DDS domain; nonnegative |
+| `odom_source` | `unitree` | `unitree`: native bridge; `ros`: external measured odometry |
+| `odom_topic` | `g1d/odom` | Adapter input; native bridge output when enabled |
+| `odom_dds_topic` | `rt/agv/odom` | Native DDS source |
+| `odom_clock_offset_s` | `0.0` | Seconds added to native odometry time |
+| `odom_max_age_s` | `0.5` | Maximum corrected odometry age (s) |
+| `camera_source` | `zmq` | `zmq`: JPEG receiver; `ros`: existing image topic |
+| `camera_endpoint` | `tcp://192.168.100.78:5556` | ZMQ sender address; nonempty when using `zmq` |
+| `camera_role` | `head_fpv` | Expected XRAW camera role |
+| `camera_frame_id` | `head_camera` | Output frame label; no coordinate transform |
+| `camera_clock_offset_s` | `0.0` | Seconds added to sender time |
+| `camera_capture_delay_s` | `0.0` | Measured capture/encoding delay subtracted (s) |
+| `camera_max_frame_age_s` | `0.5` | Maximum corrected image age (s) |
+| `image_topic` | auto | `camera/color/image_raw` for ROS; append `/compressed` for ZMQ |
+| `image_transport` | `raw` | ROS: `raw` or `compressed`; ZMQ always uses `compressed` |
+| `server_url` | empty | LightNav WebSocket URL; also settable in the web panel |
+| `max_linear_speed` | `0.3` | Shared speed cap (m/s); `0 < value <= 1.5` |
+| `max_angular_speed` | `0.3` | Shared yaw-rate cap (rad/s); `0 < value <= 0.6` |
+
+MPC/WASD acceleration limits are `0.5 m/s²` and `0.5 rad/s²`; MPC output scales
+are `1.0`. Adapter caps remain enforced after web-panel changes.
+
+Additional `g1d_adapter` node settings are supplied as ROS parameters:
+
+| Adapter parameter | Default | Meaning |
+| --- | --- | --- |
+| `network_interface` | required | Robot DDS network interface |
+| `dds_domain_id` | `0` | Unitree DDS domain; nonnegative |
+| `odom_topic` | `g1d/odom` | Measured input; must differ from output `odom` |
+| `native_odom_dds_topic` | empty | Launch-set DDS feedback-loop guard; empty for external odometry |
+| `odom_frame` / `base_frame` | `odom` / `base_link` | Required distinct input frame IDs |
+| `publish_tf` | `false` | Publish measured TF; avoid duplicating the odometry source's TF |
+| `max_linear_speed` / `max_angular_speed` | `0.3` / `0.3` | Speed caps (m/s, rad/s); maxima `1.5` / `0.6` |
+| `input_watchdog_s` | `0.35` | Command timeout after the first valid command; hold zero before it |
+| `state_timeout_s` | `0.5` | Measured-odometry timeout (s) |
+| `sdk_timeout_s` | `0.1` | RPC timeout; `2 × timeout + 0.1 s` must be below both watchdogs |
+| `control_rate_hz` | `20.0` | Nominal send rate (Hz); RPC time adds to the period |
+| `zero_frames` | `5` | Zero-speed send attempts on stop; positive integer |
+
+Rates, timeouts and speed caps must be finite and positive. See the
+[G1-D guide](../robot_deploy/src/robot_adapters/g1d_adapter/README.md) for SDK/DDS
+setup, frame requirements and stop/fault recovery.
+
+## G1-D native odometry receiver
+
+`g1d_odometry` bridges measured DDS odometry to ROS without sending motion commands.
+
+| Node parameter | Default | Meaning |
+| --- | --- | --- |
+| `network_interface` | required | Robot DDS network interface |
+| `dds_domain_id` | `0` | Unitree DDS domain; nonnegative |
+| `dds_topic` | `rt/agv/odom` | Native DDS source |
+| `odom_topic` | `g1d/odom` | ROS output; must not map back to the DDS source |
+| `odom_frame` / `base_frame` | `odom` / `base_link` | Expected frames; an empty native `child_frame_id` is filled with `base_frame`, without a coordinate transform |
+| `clock_offset_s` | `0.0` | Seconds added to source time |
+| `max_age_s` | `0.5` | Maximum corrected sample age (s) |
+| `poll_rate_hz` | `100.0` | Polling rate (Hz), independent of sensor rate |
+
+Source timestamps are preserved plus the offset; stale or invalid samples are rejected.
+See [odometry setup](../robot_deploy/src/robot_adapters/g1d_adapter/README.md#native-odometry-bridge).
+
+## Standalone ZMQ camera sender
+
+[mjpg_zmq_sender.py setup](../robot_deploy/src/vln_camera/README.md#standalone-sender)
+covers dependencies and startup. The sender runs independently of ROS.
+
+| CLI flag | Default | Meaning |
+| --- | --- | --- |
+| `--camera ROLE=DEVICE` | required | Repeatable role/device pair, e.g. `head_fpv=/dev/video0` |
+| `--bind ROLE=ENDPOINT` | required | One matching bind per role, e.g. `head_fpv=tcp://0.0.0.0:5556` |
+| `--width` | `640` | Requested width (pixels) |
+| `--height` | `480` | Requested height (pixels) |
+| `--fps` | `60.0` | Requested FPS; head-camera examples use `30` |
+| `--encoding` | `jpeg` | `jpeg` or `raw_bgr`; ROS receiver accepts only `jpeg` |
+| `--jpeg-quality` | `80` | JPEG quality, 1–100 |
+| `--duration` | `0.0` | Seconds to run; `0` means until interrupted |
+| `-h`, `--help` | — | Show help and exit |
+
+## ZMQ head-camera receiver
+
+`zmq_camera` converts single-part XRAW v2 JPEG packets to ROS `CompressedImage`.
+See [receiver setup](../robot_deploy/src/vln_camera/README.md#receiver-only).
+
+| Node parameter | Default | Meaning |
+| --- | --- | --- |
+| `endpoint` | required | ZMQ sender address, e.g. `tcp://192.168.100.78:5556` |
+| `camera_role` | `head_fpv` | Expected XRAW camera role |
+| `image_topic` | `camera/color/image_raw/compressed` | ROS image output |
+| `frame_id` | `head_camera` | Output frame label |
+| `clock_offset_s` | `0.0` | Seconds added to sender time |
+| `capture_delay_s` | `0.0` | Measured capture/encoding delay subtracted (s) |
+| `max_frame_age_s` | `0.5` | Maximum corrected image age (s) |
+| `poll_rate_hz` | `100.0` | Polling rate (Hz), independent of camera FPS |
+| `max_packet_bytes` | `8388608` | Packet size limit including header (bytes) |
+
+`stamp = sender_wall + clock_offset_s - capture_delay_s` estimates capture time.
+Corrections require measurement and synchronized clocks; see
+[timestamp details](../robot_deploy/src/vln_camera/README.md#wire-format-and-timestamps).

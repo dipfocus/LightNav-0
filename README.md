@@ -260,6 +260,8 @@ ROS 2 on-robot stack — camera driver, WebSocket client, MPC waypoint tracker a
 panel — with adapters for the Unitree Go2 and LimX TRON 1, and a
 [bring-your-own-robot](robot_deploy/README.md#bring-your-own-robot) adapter interface.
 
+For Unitree G1-D, see the [setup guide](robot_deploy/README.md#unitree-g1-d).
+
 The client loop, velocity mapping and wire protocol are in
 [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#real-robot-deployment),
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/PROTOCOL.md](docs/PROTOCOL.md).
