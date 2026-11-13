@@ -9,7 +9,7 @@ setup(
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml", "README.md"]),
-        ("share/" + package_name + "/scripts", ["scripts/mjpg_zmq_sender.py"]),
+        ("share/" + package_name + "/scripts", ["scripts/mjpg_zmq_sender.py", "scripts/zmq_camera_viewer.py"]),
     ],
     install_requires=["setuptools"],
     zip_safe=True,

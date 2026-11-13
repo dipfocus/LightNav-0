@@ -1,8 +1,8 @@
 # vln_camera
 
-Standalone camera sender and ROS 2 receiver:
+Standalone camera sender, desktop viewer and ROS 2 receiver:
 `camera → XRAW v2 JPEG over ZMQ → sensor_msgs/CompressedImage`.
-Start the sender separately; the receiver only subscribes to its stream.
+Start the sender separately; the viewer and receiver only subscribe to its stream.
 
 ## Standalone sender
 
@@ -22,6 +22,22 @@ Receivers connect to the camera host's IP, e.g. `tcp://192.168.100.78:5556`.
 See [sender options](../../../docs/CONFIGURATION.md#standalone-zmq-camera-sender).
 The [script](scripts/mjpg_zmq_sender.py) retains its XR Robotics MIT notice and
 source revision.
+
+## Standalone viewer
+
+Preview the stream on a desktop with Python 3.10+, without ROS.
+From the repository root:
+
+```bash
+python3 -m venv .venv-camera-viewer
+source .venv-camera-viewer/bin/activate
+python -m pip install opencv-python numpy pyzmq
+python robot_deploy/src/vln_camera/scripts/zmq_camera_viewer.py tcp://PI_IP:5556
+```
+
+Replace `PI_IP` with the sender's IP. Keep GUI-enabled `opencv-python` in this
+separate environment; `opencv-python-headless` cannot display windows.
+Press **Q** or **Esc** to exit. See [viewer options](../../../docs/CONFIGURATION.md#standalone-zmq-camera-viewer).
 
 ## Receiver only
 
@@ -79,5 +95,5 @@ See [receiver parameters](../../../docs/CONFIGURATION.md#zmq-head-camera-receive
 From the repository root, without ROS or camera hardware:
 
 ```bash
-python -m pytest -q tests/test_mjpg_zmq_sender.py tests/test_xraw_camera.py tests/test_g1d_camera_launch.py
+python -m pytest -q tests/test_mjpg_zmq_sender.py tests/test_zmq_camera_viewer.py tests/test_xraw_camera.py tests/test_g1d_camera_launch.py
 ```

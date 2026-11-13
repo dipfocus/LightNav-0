@@ -266,6 +266,16 @@ covers dependencies and startup. The sender runs independently of ROS.
 | `--duration` | `0.0` | Seconds to run; `0` means until interrupted |
 | `-h`, `--help` | — | Show help and exit |
 
+## Standalone ZMQ camera viewer
+
+Preview without ROS; requires GUI-enabled OpenCV. See [setup](../robot_deploy/src/vln_camera/README.md#standalone-viewer).
+
+| CLI argument | Default | Meaning |
+| --- | --- | --- |
+| `endpoint` | required | Sender `tcp://HOST:PORT`; use a concrete host address |
+| `--camera-role` | `head_fpv` | Must match the sender's camera role |
+| `-h`, `--help` | — | Show help and exit |
+
 ## ZMQ head-camera receiver
 
 `zmq_camera` converts single-part XRAW v2 JPEG packets to ROS `CompressedImage`.
